@@ -6,6 +6,7 @@
 #import <react/renderer/components/SelectableTextViewSpec/RCTComponentViewHelpers.h>
 
 #import <React/RCTConversions.h>
+#import <React/RCTMountingTransactionObserving.h>
 #import "RCTFabricComponentsPlugins.h"
 
 using namespace facebook::react;
@@ -48,11 +49,12 @@ using namespace facebook::react;
 
 @end
 
-@interface SelectableTextView () <RCTSelectableTextViewViewProtocol>
+@interface SelectableTextView () <RCTMountingTransactionObserving, RCTSelectableTextViewViewProtocol>
 @end
 
 @implementation SelectableTextView {
     std::vector<std::string> _menuOptionsVector;
+    NSMutableSet<NSNumber *> *_contentComponentTags;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
@@ -80,6 +82,7 @@ using namespace facebook::react;
     _textView.dataDetectorTypes = UIDataDetectorTypeNone;
     _textView.text = @"";
     _menuOptions = @[];
+    _contentComponentTags = [NSMutableSet new];
 
     self.contentView = _textView;
     self.userInteractionEnabled = YES;
@@ -116,16 +119,65 @@ using namespace facebook::react;
     [self updateTextViewContent];
 }
 
+- (void)mountingTransactionDidMount:(const MountingTransaction &)transaction
+               withSurfaceTelemetry:(const facebook::react::SurfaceTelemetry &)surfaceTelemetry
+{
+    (void)surfaceTelemetry;
+
+    if ([self mountingTransactionAffectsTextContent:transaction]) {
+        [self updateTextViewContent];
+    }
+}
+
+- (BOOL)mountingTransactionAffectsTextContent:(const MountingTransaction &)transaction
+{
+    Tag ownTag = (Tag)self.tag;
+
+    for (const auto &mutation : transaction.getMutations()) {
+        if (mutation.parentTag == ownTag ||
+            [self contentComponentTagsContainTag:mutation.parentTag] ||
+            [self contentComponentTagsContainTag:mutation.oldChildShadowView.tag] ||
+            [self contentComponentTagsContainTag:mutation.newChildShadowView.tag]) {
+            return YES;
+        }
+    }
+
+    return NO;
+}
+
+- (BOOL)contentComponentTagsContainTag:(Tag)tag
+{
+    if (tag <= 0) {
+        return NO;
+    }
+
+    return [_contentComponentTags containsObject:@(tag)];
+}
+
 - (void)updateTextViewContent
 {
     NSMutableAttributedString *combinedAttributedText = [[NSMutableAttributedString alloc] init];
-    [self extractStyledTextFromView:self intoAttributedString:combinedAttributedText hideViews:YES];
+    NSMutableSet<NSNumber *> *contentComponentTags = [NSMutableSet new];
+
+    [self extractStyledTextFromView:self
+               intoAttributedString:combinedAttributedText
+                           hideViews:YES
+                contentComponentTags:contentComponentTags];
+
+    _contentComponentTags = contentComponentTags;
     _textView.attributedText = combinedAttributedText;
 }
 
-- (void)extractStyledTextFromView:(UIView *)view intoAttributedString:(NSMutableAttributedString *)attributedString hideViews:(BOOL)hideViews
+- (void)extractStyledTextFromView:(UIView *)view
+             intoAttributedString:(NSMutableAttributedString *)attributedString
+                         hideViews:(BOOL)hideViews
+              contentComponentTags:(NSMutableSet<NSNumber *> *)contentComponentTags
 {
     BOOL foundText = NO;
+
+    if (view != self && view != _textView && view.tag > 0) {
+        [contentComponentTags addObject:@(view.tag)];
+    }
 
     if ([view respondsToSelector:@selector(attributedText)]) {
         NSAttributedString *attributedText = [view performSelector:@selector(attributedText)];
@@ -160,7 +212,10 @@ using namespace facebook::react;
 
     for (UIView *subview in view.subviews) {
         if (subview != _textView) {
-            [self extractStyledTextFromView:subview intoAttributedString:attributedString hideViews:hideViews];
+            [self extractStyledTextFromView:subview
+                       intoAttributedString:attributedString
+                                   hideViews:hideViews
+                        contentComponentTags:contentComponentTags];
         }
     }
 }
