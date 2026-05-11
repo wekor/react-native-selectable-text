@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { SelectableTextView } from '@wekor/react-native-selectable-text';
+import { SelectableText } from '@wekor/react-native-selectable-text';
 
 type Mode = 'simple' | 'flashlist';
 
@@ -37,16 +37,13 @@ function SimpleScene() {
 
   return (
     <View style={styles.simpleContainer}>
-      <SelectableTextView
+      <SelectableText
         selectionColor="#FF6B3530"
-        style={styles.selectableText}
+        style={[styles.selectableText, styles.text, isRed && styles.redText]}
       >
-        <Text style={[styles.text, isRed && styles.redText]}>
-          Long press to select text and see the context menu. Copy and Select
-          All are built-in, plus custom options like Share, Search, and
-          Translate.
-        </Text>
-      </SelectableTextView>
+        Long press to select text and see the context menu. Copy and Select All
+        are built-in, plus custom options like Share, Search, and Translate.
+      </SelectableText>
 
       <View style={styles.buttonContainer}>
         <Button
@@ -71,12 +68,12 @@ function FlashListScene() {
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         >
           <Text style={styles.rowIndex}>#{item.id}</Text>
-          <SelectableTextView
+          <SelectableText
             selectionColor="#FF6B3530"
-            style={styles.rowSelectable}
+            style={[styles.rowSelectable, styles.rowText]}
           >
-            <Text style={styles.rowText}>{item.text}</Text>
-          </SelectableTextView>
+            {item.text}
+          </SelectableText>
         </Pressable>
       )}
       contentContainerStyle={styles.flashContent}

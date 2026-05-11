@@ -1,2 +1,2 @@
-export { default as SelectableTextView } from './SelectableTextViewNativeComponent';
-export type { SelectionEvent } from './SelectableTextViewNativeComponent';
+export { default as SelectableText } from './SelectableText';
+export type { SelectableTextProps, SelectionEvent } from './SelectableText';

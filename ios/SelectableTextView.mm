@@ -1,12 +1,12 @@
 #import "SelectableTextView.h"
+#import "../cpp/SelectableTextShadowNode.h"
 
-#import <react/renderer/components/SelectableTextViewSpec/ComponentDescriptors.h>
 #import <react/renderer/components/SelectableTextViewSpec/EventEmitters.h>
 #import <react/renderer/components/SelectableTextViewSpec/Props.h>
 #import <react/renderer/components/SelectableTextViewSpec/RCTComponentViewHelpers.h>
+#import <react/renderer/textlayoutmanager/RCTAttributedTextUtils.h>
 
 #import <React/RCTConversions.h>
-#import <React/RCTMountingTransactionObserving.h>
 #import "RCTFabricComponentsPlugins.h"
 
 using namespace facebook::react;
@@ -49,46 +49,52 @@ using namespace facebook::react;
 
 @end
 
-@interface SelectableTextView () <RCTMountingTransactionObserving, RCTSelectableTextViewViewProtocol>
+@interface SelectableTextView () <RCTSelectableTextViewViewProtocol>
 @end
 
 @implementation SelectableTextView {
     std::vector<std::string> _menuOptionsVector;
-    NSMutableSet<NSNumber *> *_contentComponentTags;
+    SelectableTextShadowNode::ConcreteState::Shared _state;
 }
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-    return concreteComponentDescriptorProvider<SelectableTextViewComponentDescriptor>();
+    return concreteComponentDescriptorProvider<SelectableTextComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame
 {
-  if (self = [super initWithFrame:frame]) {
-    static const auto defaultProps = std::make_shared<const SelectableTextViewProps>();
-    _props = defaultProps;
+    if (self = [super initWithFrame:frame]) {
+        static const auto defaultProps = std::make_shared<const SelectableTextViewProps>();
+        _props = defaultProps;
 
-    _textView = [[SelectableUITextView alloc] init];
-    ((SelectableUITextView *)_textView).parentSelectableTextView = self;
-    _textView.delegate = self;
-    _textView.editable = NO;
-    _textView.selectable = YES;
-    _textView.scrollEnabled = NO;
-    _textView.backgroundColor = [UIColor clearColor];
-    _textView.textContainerInset = UIEdgeInsetsZero;
-    _textView.textContainer.lineFragmentPadding = 0;
-    _textView.userInteractionEnabled = YES;
-    _textView.allowsEditingTextAttributes = NO;
-    _textView.dataDetectorTypes = UIDataDetectorTypeNone;
-    _textView.text = @"";
-    _menuOptions = @[];
-    _contentComponentTags = [NSMutableSet new];
+        _textView = [[SelectableUITextView alloc] init];
+        ((SelectableUITextView *)_textView).parentSelectableTextView = self;
+        _textView.delegate = self;
+        _textView.editable = NO;
+        _textView.selectable = YES;
+        _textView.scrollEnabled = NO;
+        _textView.backgroundColor = [UIColor clearColor];
+        _textView.textContainerInset = UIEdgeInsetsZero;
+        _textView.textContainer.lineFragmentPadding = 0;
+        _textView.textContainer.lineBreakMode = NSLineBreakByTruncatingTail;
+        _textView.userInteractionEnabled = YES;
+        _textView.allowsEditingTextAttributes = NO;
+        _textView.dataDetectorTypes = UIDataDetectorTypeNone;
+        _menuOptions = @[];
 
-    self.contentView = _textView;
-    self.userInteractionEnabled = YES;
-  }
+        self.contentView = _textView;
+        self.userInteractionEnabled = YES;
+    }
 
-  return self;
+    return self;
+}
+
+- (void)prepareForRecycle
+{
+    [super prepareForRecycle];
+    _state.reset();
+    _textView.attributedText = nil;
 }
 
 - (void)updateProps:(Props::Shared const &)props oldProps:(Props::Shared const &)oldProps
@@ -110,114 +116,35 @@ using namespace facebook::react;
         _textView.tintColor = RCTUIColorFromSharedColor(newViewProps.selectionColor);
     }
 
+    if (oldViewProps.numberOfLines != newViewProps.numberOfLines) {
+        _textView.textContainer.maximumNumberOfLines =
+            newViewProps.numberOfLines > 0 ? newViewProps.numberOfLines : 0;
+    }
+
     [super updateProps:props oldProps:oldProps];
+}
+
+- (void)updateState:(const facebook::react::State::Shared &)state
+           oldState:(const facebook::react::State::Shared &)oldState
+{
+    auto previous = _state;
+    _state = std::static_pointer_cast<const SelectableTextShadowNode::ConcreteState>(state);
+    if (!_state) {
+        return;
+    }
+    // Skip the (relatively expensive) C++ -> NSAttributedString conversion
+    // and UITextView attributedText assignment when only the frame changed.
+    if (previous && previous->getData().attributedString == _state->getData().attributedString) {
+        return;
+    }
+    _textView.attributedText =
+        RCTNSAttributedStringFromAttributedString(_state->getData().attributedString);
 }
 
 - (void)layoutSubviews
 {
     [super layoutSubviews];
-    [self updateTextViewContent];
-}
-
-- (void)mountingTransactionDidMount:(const MountingTransaction &)transaction
-               withSurfaceTelemetry:(const facebook::react::SurfaceTelemetry &)surfaceTelemetry
-{
-    (void)surfaceTelemetry;
-
-    if ([self mountingTransactionAffectsTextContent:transaction]) {
-        [self updateTextViewContent];
-    }
-}
-
-- (BOOL)mountingTransactionAffectsTextContent:(const MountingTransaction &)transaction
-{
-    Tag ownTag = (Tag)self.tag;
-
-    for (const auto &mutation : transaction.getMutations()) {
-        if (mutation.parentTag == ownTag ||
-            [self contentComponentTagsContainTag:mutation.parentTag] ||
-            [self contentComponentTagsContainTag:mutation.oldChildShadowView.tag] ||
-            [self contentComponentTagsContainTag:mutation.newChildShadowView.tag]) {
-            return YES;
-        }
-    }
-
-    return NO;
-}
-
-- (BOOL)contentComponentTagsContainTag:(Tag)tag
-{
-    if (tag <= 0) {
-        return NO;
-    }
-
-    return [_contentComponentTags containsObject:@(tag)];
-}
-
-- (void)updateTextViewContent
-{
-    NSMutableAttributedString *combinedAttributedText = [[NSMutableAttributedString alloc] init];
-    NSMutableSet<NSNumber *> *contentComponentTags = [NSMutableSet new];
-
-    [self extractStyledTextFromView:self
-               intoAttributedString:combinedAttributedText
-                           hideViews:YES
-                contentComponentTags:contentComponentTags];
-
-    _contentComponentTags = contentComponentTags;
-    _textView.attributedText = combinedAttributedText;
-}
-
-- (void)extractStyledTextFromView:(UIView *)view
-             intoAttributedString:(NSMutableAttributedString *)attributedString
-                         hideViews:(BOOL)hideViews
-              contentComponentTags:(NSMutableSet<NSNumber *> *)contentComponentTags
-{
-    BOOL foundText = NO;
-
-    if (view != self && view != _textView && view.tag > 0) {
-        [contentComponentTags addObject:@(view.tag)];
-    }
-
-    if ([view respondsToSelector:@selector(attributedText)]) {
-        NSAttributedString *attributedText = [view performSelector:@selector(attributedText)];
-        if (attributedText && attributedText.length > 0) {
-            [attributedString appendAttributedString:attributedText];
-            foundText = YES;
-        }
-    }
-    else if ([view isKindOfClass:[UILabel class]]) {
-        UILabel *label = (UILabel *)view;
-        if (label.attributedText && label.attributedText.length > 0) {
-            [attributedString appendAttributedString:label.attributedText];
-            foundText = YES;
-        } else if (label.text && label.text.length > 0) {
-            NSAttributedString *plainText = [[NSAttributedString alloc] initWithString:label.text];
-            [attributedString appendAttributedString:plainText];
-            foundText = YES;
-        }
-    }
-    else if ([view respondsToSelector:@selector(text)]) {
-        NSString *text = [view performSelector:@selector(text)];
-        if (text && text.length > 0) {
-            NSAttributedString *plainText = [[NSAttributedString alloc] initWithString:text];
-            [attributedString appendAttributedString:plainText];
-            foundText = YES;
-        }
-    }
-
-    if (foundText && hideViews) {
-        view.hidden = YES;
-    }
-
-    for (UIView *subview in view.subviews) {
-        if (subview != _textView) {
-            [self extractStyledTextFromView:subview
-                       intoAttributedString:attributedString
-                                   hideViews:hideViews
-                        contentComponentTags:contentComponentTags];
-        }
-    }
+    _textView.frame = self.bounds;
 }
 
 #pragma mark - UITextViewDelegate

@@ -31,19 +31,71 @@ class SelectableTextViewManager : ViewGroupManager<SelectableTextView>(),
     return SelectableTextView(context)
   }
 
+  @ReactProp(name = "value")
+  override fun setValue(view: SelectableTextView, value: String?) {
+    view.setValue(value)
+  }
+
   @ReactProp(name = "menuOptions")
   override fun setMenuOptions(view: SelectableTextView, menuOptions: ReadableArray?) {
-    if (menuOptions != null) {
-      val options = Array(menuOptions.size()) { i ->
+    val options = if (menuOptions != null) {
+      Array(menuOptions.size()) { i ->
         menuOptions.getString(i) ?: ""
       }
-      view.setMenuOptions(options)
+    } else {
+      emptyArray()
     }
+    view.setMenuOptions(options)
   }
 
   @ReactProp(name = "selectionColor", customType = "Color")
   override fun setSelectionColor(view: SelectableTextView, selectionColor: Int?) {
     view.setSelectionColor(selectionColor)
+  }
+
+  @ReactProp(name = "textColor", customType = "Color")
+  override fun setTextColor(view: SelectableTextView, textColor: Int?) {
+    view.setTextColor(textColor)
+  }
+
+  @ReactProp(name = "fontSize", defaultFloat = 0f)
+  override fun setFontSize(view: SelectableTextView, fontSize: Float) {
+    view.setFontSize(fontSize)
+  }
+
+  @ReactProp(name = "lineHeight", defaultFloat = 0f)
+  override fun setLineHeight(view: SelectableTextView, lineHeight: Float) {
+    view.setLineHeight(lineHeight)
+  }
+
+  @ReactProp(name = "letterSpacing", defaultFloat = 0f)
+  override fun setLetterSpacing(view: SelectableTextView, letterSpacing: Float) {
+    view.setLetterSpacing(letterSpacing)
+  }
+
+  @ReactProp(name = "fontFamily")
+  override fun setFontFamily(view: SelectableTextView, fontFamily: String?) {
+    view.setFontFamily(fontFamily)
+  }
+
+  @ReactProp(name = "fontWeight")
+  override fun setFontWeight(view: SelectableTextView, fontWeight: String?) {
+    view.setFontWeight(fontWeight)
+  }
+
+  @ReactProp(name = "fontStyle")
+  override fun setFontStyle(view: SelectableTextView, fontStyle: String?) {
+    view.setFontStyle(fontStyle)
+  }
+
+  @ReactProp(name = "textAlign")
+  override fun setTextAlign(view: SelectableTextView, textAlign: String?) {
+    view.setTextAlign(textAlign)
+  }
+
+  @ReactProp(name = "numberOfLines", defaultInt = 0)
+  override fun setNumberOfLines(view: SelectableTextView, numberOfLines: Int) {
+    view.setNumberOfLines(numberOfLines)
   }
 
   override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any>? {

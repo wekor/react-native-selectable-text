@@ -35,24 +35,24 @@ cd ios && pod install
 
 ## Usage
 
+`SelectableText` works as a drop-in for `Text`. Children must be a single string.
+
 ```tsx
-import { Text } from 'react-native';
-import { SelectableTextView } from '@wekor/react-native-selectable-text';
+import { SelectableText } from '@wekor/react-native-selectable-text';
 
 function App() {
   return (
-    <SelectableTextView
+    <SelectableText
       menuOptions={['Share', 'Search', 'Translate']}
       selectionColor="#FF6B3530"
+      style={{ fontSize: 16, lineHeight: 24, color: '#222' }}
       onSelection={(event) => {
         const { chosenOption, highlightedText } = event.nativeEvent;
         console.log(chosenOption, highlightedText);
       }}
     >
-      <Text style={{ fontSize: 16, lineHeight: 24 }}>
-        Long press to select text and see the context menu.
-      </Text>
-    </SelectableTextView>
+      Long press to select text and see the context menu.
+    </SelectableText>
   );
 }
 ```
@@ -61,11 +61,12 @@ function App() {
 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
+| `children` | `string` | Yes | Text content. Must be a plain string — nested `Text` or other elements are not supported |
+| `style` | `TextStyle` | No | Text and layout style. Text properties (`color`, `fontSize`, `lineHeight`, `fontWeight`, `fontStyle`, `fontFamily`, `letterSpacing`, `textAlign`) drive both the native rendering and the shadow-node measurement; remaining properties (padding, background, etc.) are applied to the underlying view |
+| `numberOfLines` | `number` | No | Maximum number of lines; tail-truncates beyond this |
 | `menuOptions` | `string[]` | No | Additional custom menu items. **Copy** and **Select All** are always included by default. Do not pass "Copy" or "Select All" here, as it will create duplicates |
 | `selectionColor` | `ColorValue` | No | Highlight color for selected text |
 | `onSelection` | `(event) => void` | No | Callback when a custom menu item is tapped. `event.nativeEvent` contains `chosenOption` and `highlightedText` |
-
-Inherits all [View](https://reactnative.dev/docs/view#props) props.
 
 ## Contributing
 
