@@ -9,6 +9,8 @@ import android.util.AttributeSet
 import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import com.facebook.react.bridge.ReactContext
@@ -107,9 +109,31 @@ class SelectableTextView : FrameLayout {
     eventDispatcher?.dispatchEvent(OnSelectionEvent(surfaceId, id, chosenOption, highlightedText))
   }
 
+  override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+    if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+      parent?.requestDisallowInterceptTouchEvent(true)
+    }
+    return super.dispatchTouchEvent(ev)
+  }
+
+  override fun onViewAdded(child: View?) {
+    super.onViewAdded(child)
+    if (child is TextView) {
+      textView = child
+      setupSelectionCallback(child)
+    }
+  }
+
+  override fun onViewRemoved(child: View?) {
+    super.onViewRemoved(child)
+    if (child === textView) {
+      textView = null
+    }
+  }
+
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
     super.onLayout(changed, left, top, right, bottom)
-    if (changed && textView == null) {
+    if (textView == null) {
       setupTextView()
     }
   }
